@@ -69,6 +69,7 @@ jobs:
 
       # we commented out becuse we are going to deply github pages
       - name: Deploy Allure Report to GitHub Pages 🚀
+        if: always()
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
