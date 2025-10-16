@@ -11,8 +11,8 @@ permissions:
   contents: write  # ✅ Required to push to gh-pages
 
 jobs:
-  run-tests:
-    name: Run Tests on s3-runner
+  build:  # ✅ Now matches 'needs: build'
+    name: Run Tests on Self-Hosted Runner
     runs-on: [self-hosted, s3-runner]  # Use your labeled self-hosted runner
 
     steps:
