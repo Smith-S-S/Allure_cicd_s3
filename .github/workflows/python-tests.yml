@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+
+permissions:
+  contents: write  # ✅ Required to push to gh-pages
+
 jobs:
   run-tests:
     name: Run Tests on s3-runner
@@ -75,4 +79,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
           publish_branch: gh-pages
-          force_orphan: true  # Ensures clean branch, no history
+          force_orphan: true
