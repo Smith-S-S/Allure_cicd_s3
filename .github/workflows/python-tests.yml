@@ -52,3 +52,16 @@ jobs:
       - name: Run Pytest with Allure
         run: |
           pytest test_always_pass.py test_always_fail.py test_calculator_app.py --alluredir=allure-results
+
+      - name: Generate Allure Report
+        if: always()
+        run: |
+          pip install allure-commandline
+          allure generate allure-results --clean -o allure-report
+
+      - name: Upload Allure Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: allure-report
+          path: allure-report
