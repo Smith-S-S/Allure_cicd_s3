@@ -1,0 +1,5 @@
+pytest
+allure-pytest
+pyautogui
+opencv-python
+# Add other deps like pillow, numpy, etc. if needed

@@ -1,0 +1,30 @@
+name: Run Pytest with Allure on Self-Hosted Runner
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  run-tests:
+    name: Run Tests on s3-runner
+    runs-on: [self-hosted, s3-runner]  # Use your labeled self-hosted runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest with Allure
+        run: |
+          pytest test_always_pass.py test_always_fail.py test_calculator_app.py --alluredir=allure-results
