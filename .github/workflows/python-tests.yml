@@ -20,6 +20,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Install Allure CLI
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            irm get.scoop.sh | iex
+            $scoopPath = "$env:USERPROFILE\scoop\shims"
+            $env:PATH += ";$scoopPath"
+          }
+
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          scoop bucket add java | Out-Null
+          scoop install allure | Out-Null
+
+          allure --version
+          java -version
+
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
