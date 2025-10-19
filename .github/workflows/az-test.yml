@@ -159,6 +159,32 @@ jobs:
           
           Write-Host "Archive upload completed successfully"
 
+          # Update JSON file
+          $jsonPath = "./archive_index.json"
+          if (Test-Path $jsonPath) {
+              $archives = Get-Content $jsonPath | ConvertFrom-Json
+          } else {
+              $archives = @()
+          }
+
+          $archives += [PSCustomObject]@{
+              name = $archivePath
+              date = (Get-Date).ToString("yyyy/MM/dd HH:mm")
+          }
+
+          $archives | ConvertTo-Json | Set-Content $jsonPath -Force
+
+          # Upload JSON file to blob
+          az storage blob upload `
+            --account-name $storageAccount `
+            --container-name '$web' `
+            --name 'reports/archive/index.json' `
+            --file $jsonPath `
+            --overwrite `
+            --auth-mode login
+
+          Write-Host "Archive data upload completed successfully"
+
       - name: Generate Report URLs
         if: always()
         shell: powershell
@@ -226,3 +252,4 @@ jobs:
         shell: powershell
         run: |
           az logout
+
