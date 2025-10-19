@@ -123,7 +123,7 @@ jobs:
       - name: Upload to Azure Blob Storage - Latest
         shell: powershell
         run: |
-          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $storageAccount = "${{ vars.AZURE_STORAGE_ACCOUNT }}"
           
           Write-Host "Uploading to Azure Blob Storage..."
           Write-Host "Storage Account: $storageAccount"
@@ -142,7 +142,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: powershell
         run: |
-          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $storageAccount = "${{ vars.AZURE_STORAGE_ACCOUNT }}"
           $timestamp = Get-Date -Format "yyyy-MM-dd-HHmm"
           $buildNumber = "${{ github.run_number }}"
           $archivePath = "build-${buildNumber}_${timestamp}"
@@ -163,7 +163,7 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $storageAccount = "${{ vars.AZURE_STORAGE_ACCOUNT }}"
           $baseUrl = "https://$storageAccount.z23.web.core.windows.net"
           $latestUrl = "$baseUrl/reports/latest/index.html"
           
@@ -188,7 +188,7 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $storageAccount = "${{ vars.AZURE_STORAGE_ACCOUNT }}"
           $baseUrl = "https://$storageAccount.z23.web.core.windows.net"
           $latestUrl = "$baseUrl/reports/latest/index.html"
           
