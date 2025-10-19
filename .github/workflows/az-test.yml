@@ -1,0 +1,263 @@
+name: Run Pytest with Allure and Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Enable manual trigger
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    name: Run Tests on Self-Hosted Runner
+    runs-on: [self-hosted, s3-runner]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Java for Allure
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Allure CLI
+        shell: powershell
+        run: |
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+
+          if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            irm get.scoop.sh | iex
+            $scoopPath = "$env:USERPROFILE\scoop\shims"
+            $env:PATH += ";$scoopPath"
+          }
+
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          scoop bucket add java | Out-Null
+          scoop install allure | Out-Null
+
+          allure --version
+          java -version
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest with Allure
+        run: |
+          pytest test_always_pass.py test_always_fail.py test_calculator_app.py --alluredir=allure-results
+
+      - name: Generate Allure Report
+        if: always()
+        shell: powershell
+        run: |
+          if (Test-Path "allure-results") {
+            allure generate --clean "allure-results" -o "allure-report"
+            Write-Host "✅ Allure report generated successfully"
+          } else {
+            Write-Host "❌ No allure-results directory found"
+            exit 1
+          }
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: |
+            AugmentusTests/Logs/**/*.log
+            AugmentusTests/Logs/**/*.json
+
+      - name: Upload Allure Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report
+          retention-days: 30
+
+  deploy-to-azure:
+    name: Deploy Allure Report to Azure Blob Storage
+    runs-on: [self-hosted, s3-runner]
+    needs: build
+    if: always()
+    
+    steps:
+      - name: Download Allure Report
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-report
+          path: ./allure-report
+
+      - name: Install Azure CLI (if not installed)
+        shell: powershell
+        run: |
+          # Check if Azure CLI is installed
+          if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
+            Write-Host "Installing Azure CLI..."
+            Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi
+            Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
+            Remove-Item .\AzureCLI.msi
+          }
+          az --version
+
+      - name: Azure Login
+        shell: powershell
+        run: |
+          az login --service-principal `
+            -u ${{ secrets.AZURE_CLIENT_ID }} `
+            -p ${{ secrets.AZURE_CLIENT_SECRET }} `
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Upload to Azure Blob Storage - Latest
+        shell: powershell
+        run: |
+          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          
+          Write-Host "📤 Uploading to Azure Blob Storage..."
+          Write-Host "Storage Account: $storageAccount"
+          
+          # Upload to latest folder (overwrite existing)
+          az storage blob upload-batch `
+            --account-name $storageAccount `
+            --destination '$web/reports/latest' `
+            --source ./allure-report `
+            --overwrite `
+            --auth-mode login
+          
+          Write-Host "✅ Upload to 'latest' completed"
+
+      - name: Upload to Azure Blob Storage - Archive
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: powershell
+        run: |
+          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $timestamp = Get-Date -Format "yyyy-MM-dd-HHmm"
+          $buildNumber = "${{ github.run_number }}"
+          $archivePath = "build-${buildNumber}_${timestamp}"
+          
+          Write-Host "📦 Archiving report..."
+          Write-Host "Archive path: $archivePath"
+          
+          # Upload to archived folder with timestamp
+          az storage blob upload-batch `
+            --account-name $storageAccount `
+            --destination "`$web/reports/archive/$archivePath" `
+            --source ./allure-report `
+            --auth-mode login
+          
+          Write-Host "✅ Archive upload completed"
+
+      - name: Generate Report URLs
+        if: always()
+        shell: powershell
+        run: |
+          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $baseUrl = "https://$storageAccount.z23.web.core.windows.net"
+          $latestUrl = "$baseUrl/reports/latest/index.html"
+          
+          Write-Host ""
+          Write-Host "════════════════════════════════════════════════════════"
+          Write-Host "🎯 ALLURE REPORT DEPLOYMENT SUCCESSFUL"
+          Write-Host "════════════════════════════════════════════════════════"
+          Write-Host ""
+          Write-Host "📊 Latest Report URL:"
+          Write-Host "   $latestUrl"
+          Write-Host ""
+          Write-Host "📁 All Reports Portal:"
+          Write-Host "   $baseUrl/reports/"
+          Write-Host ""
+          Write-Host "Build Number: ${{ github.run_number }}"
+          Write-Host "Commit SHA: ${{ github.sha }}"
+          Write-Host "Branch: ${{ github.ref_name }}"
+          Write-Host ""
+          Write-Host "════════════════════════════════════════════════════════"
+
+      - name: Create Job Summary
+        if: always()
+        shell: powershell
+        run: |
+          $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
+          $baseUrl = "https://$storageAccount.z23.web.core.windows.net"
+          $latestUrl = "$baseUrl/reports/latest/index.html"
+          
+          $summary = @"
+          ## 🎯 Test Execution Summary
+          
+          ### 📊 Allure Report
+          
+          **Latest Report:** [$latestUrl]($latestUrl)
+          
+          **All Reports:** [$baseUrl/reports/]($baseUrl/reports/)
+          
+          ### 📋 Build Information
+          
+          - **Build Number:** ${{ github.run_number }}
+          - **Commit:** ``${{ github.sha }}``
+          - **Branch:** ``${{ github.ref_name }}``
+          - **Triggered by:** ${{ github.actor }}
+          - **Workflow:** ${{ github.workflow }}
+          
+          ### ⏱️ Execution Details
+          
+          - **Started:** ${{ github.event.head_commit.timestamp }}
+          - **Repository:** ${{ github.repository }}
+          
+          ---
+          
+          💡 **Tip:** Share the Latest Report URL with your team for quick access!
+          "@
+          
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Logout from Azure
+        if: always()
+        shell: powershell
+        run: |
+          az logout
+
+  # Optional: Keep GitHub Pages deployment as backup
+  deploy-to-github-pages:
+    name: Deploy to GitHub Pages (Backup)
+    runs-on: [self-hosted, s3-runner]
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download Allure Report
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-report
+          path: ./allure-report
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./allure-report
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
