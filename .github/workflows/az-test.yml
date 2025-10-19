@@ -64,9 +64,9 @@ jobs:
         run: |
           if (Test-Path "allure-results") {
             allure generate --clean "allure-results" -o "allure-report"
-            Write-Host "✅ Allure report generated successfully"
+            Write-Host "Allure report generated successfully"
           } else {
-            Write-Host "❌ No allure-results directory found"
+            Write-Host "ERROR: No allure-results directory found"
             exit 1
           }
 
@@ -125,7 +125,7 @@ jobs:
         run: |
           $storageAccount = "${{ secrets.AZURE_STORAGE_ACCOUNT }}"
           
-          Write-Host "📤 Uploading to Azure Blob Storage..."
+          Write-Host "Uploading to Azure Blob Storage..."
           Write-Host "Storage Account: $storageAccount"
           
           # Upload to latest folder (overwrite existing)
@@ -136,7 +136,7 @@ jobs:
             --overwrite `
             --auth-mode login
           
-          Write-Host "✅ Upload to 'latest' completed"
+          Write-Host "Upload to 'latest' completed successfully"
 
       - name: Upload to Azure Blob Storage - Archive
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -147,7 +147,7 @@ jobs:
           $buildNumber = "${{ github.run_number }}"
           $archivePath = "build-${buildNumber}_${timestamp}"
           
-          Write-Host "📦 Archiving report..."
+          Write-Host "Archiving report..."
           Write-Host "Archive path: $archivePath"
           
           # Upload to archived folder with timestamp
@@ -157,7 +157,7 @@ jobs:
             --source ./allure-report `
             --auth-mode login
           
-          Write-Host "✅ Archive upload completed"
+          Write-Host "Archive upload completed successfully"
 
       - name: Generate Report URLs
         if: always()
@@ -168,21 +168,21 @@ jobs:
           $latestUrl = "$baseUrl/reports/latest/index.html"
           
           Write-Host ""
-          Write-Host "════════════════════════════════════════════════════════"
-          Write-Host "🎯 ALLURE REPORT DEPLOYMENT SUCCESSFUL"
-          Write-Host "════════════════════════════════════════════════════════"
+          Write-Host "========================================================"
+          Write-Host "ALLURE REPORT DEPLOYMENT SUCCESSFUL"
+          Write-Host "========================================================"
           Write-Host ""
-          Write-Host "📊 Latest Report URL:"
+          Write-Host "Latest Report URL:"
           Write-Host "   $latestUrl"
           Write-Host ""
-          Write-Host "📁 All Reports Portal:"
+          Write-Host "All Reports Portal:"
           Write-Host "   $baseUrl/reports/"
           Write-Host ""
           Write-Host "Build Number: ${{ github.run_number }}"
           Write-Host "Commit SHA: ${{ github.sha }}"
           Write-Host "Branch: ${{ github.ref_name }}"
           Write-Host ""
-          Write-Host "════════════════════════════════════════════════════════"
+          Write-Host "========================================================"
 
       - name: Create Job Summary
         if: always()
@@ -193,15 +193,15 @@ jobs:
           $latestUrl = "$baseUrl/reports/latest/index.html"
           
           $summary = @"
-          ## 🎯 Test Execution Summary
+          ## Test Execution Summary
           
-          ### 📊 Allure Report
+          ### Allure Report
           
           **Latest Report:** [$latestUrl]($latestUrl)
           
           **All Reports:** [$baseUrl/reports/]($baseUrl/reports/)
           
-          ### 📋 Build Information
+          ### Build Information
           
           - **Build Number:** ${{ github.run_number }}
           - **Commit:** ``${{ github.sha }}``
@@ -209,14 +209,14 @@ jobs:
           - **Triggered by:** ${{ github.actor }}
           - **Workflow:** ${{ github.workflow }}
           
-          ### ⏱️ Execution Details
+          ### Execution Details
           
           - **Started:** ${{ github.event.head_commit.timestamp }}
           - **Repository:** ${{ github.repository }}
           
           ---
           
-          💡 **Tip:** Share the Latest Report URL with your team for quick access!
+          **Tip:** Share the Latest Report URL with your team for quick access!
           "@
           
           $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
