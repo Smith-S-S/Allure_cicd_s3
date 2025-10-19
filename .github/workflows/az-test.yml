@@ -139,7 +139,7 @@ jobs:
           Write-Host "Upload to 'latest' completed successfully"
 
       - name: Upload to Azure Blob Storage - Archive
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         shell: powershell
         run: |
           $storageAccount = "${{ vars.AZURE_STORAGE_ACCOUNT }}"
@@ -226,38 +226,3 @@ jobs:
         shell: powershell
         run: |
           az logout
-
-  # Optional: Keep GitHub Pages deployment as backup
-  deploy-to-github-pages:
-    name: Deploy to GitHub Pages (Backup)
-    runs-on: [self-hosted, s3-runner]
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Download Allure Report
-        uses: actions/download-artifact@v4
-        with:
-          name: allure-report
-          path: ./allure-report
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./allure-report
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
